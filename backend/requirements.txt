@@ -1,0 +1,30 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+
+# LLM & Embeddings
+aiohttp==3.11.11
+sentence-transformers==3.3.1
+tiktoken==0.8.0
+
+# Graph Database
+neo4j==5.27.0
+
+# Vector Database
+chromadb==0.5.23
+
+# GNN (CPU)
+torch==2.5.1
+torch-geometric==2.6.1
+
+# Document Parsing
+pypdf==5.1.0
+beautifulsoup4==4.12.3
+markdown==3.7
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.28.1
