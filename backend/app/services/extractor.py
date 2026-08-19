@@ -104,6 +104,7 @@ Only extract information that is explicitly stated or strongly implied in the te
                 system_prompt=EXTRACTION_SYSTEM_PROMPT,
                 temperature=0.1,
                 json_mode=True,
+                tier="fast",  # Extraction is high-volume, use cheap model
             )
 
             return self._parse_extraction_result(

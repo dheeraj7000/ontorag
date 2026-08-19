@@ -1,11 +1,10 @@
 """
-LLM Router — tries free APIs in priority order, falls back to local Ollama.
+LLM Router — two-tier routing for cost/quality optimization.
 
-Provider priority:
-1. Cerebras (Llama 3.1 70B) — unlimited free, 30 req/min
-2. Groq (Mixtral 8x7B) — $5/mo credits, 20 req/min
-3. Together AI (Llama 3.1 70B) — $5 signup credit
-4. Ollama (local Llama 3.1 8B) — truly unlimited, no internet
+Tier 1 (Fast/Cheap): Llama 3.1 8B on Groq — extraction, simple JSON tasks
+Tier 2 (Smart): GPT-OSS 20B on Groq — reasoning, answer generation, hallucination detection
+
+Fallback: Ollama (local, unlimited, no internet needed)
 """
 
 import json
@@ -19,50 +18,72 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Task complexity tiers
+TASK_TIER_FAST = "fast"  # Extraction, simple JSON output
+TASK_TIER_SMART = "smart"  # Reasoning, answer generation, hallucination
+
 
 class LLMRouter:
-    """Routes LLM calls through free providers with automatic fallback."""
+    """Two-tier LLM router: fast model for extraction, smart model for reasoning."""
 
     def __init__(self):
         self.providers = self._build_provider_list()
         self.ollama_url = f"{settings.ollama_url}/api/generate"
         self._last_call_time: Dict[str, float] = {}
 
-    def _build_provider_list(self) -> List[Dict[str, Any]]:
-        """Build ordered list of available providers."""
-        providers = []
+    def _build_provider_list(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Build provider lists for each tier."""
+        fast_providers = []
+        smart_providers = []
+
+        if settings.groq_api_key:
+            # Tier 1: Fast/cheap for extraction
+            fast_providers.append({
+                "name": "groq-fast",
+                "base_url": "https://api.groq.com/openai/v1",
+                "api_key": settings.groq_api_key,
+                "model": "llama-3.1-8b-instant",
+                "max_rpm": 30,
+                "min_interval": 2.0,
+            })
+            # Tier 2: Smart for reasoning
+            smart_providers.append({
+                "name": "groq-smart",
+                "base_url": "https://api.groq.com/openai/v1",
+                "api_key": settings.groq_api_key,
+                "model": "gpt-oss-20b",
+                "max_rpm": 15,
+                "min_interval": 4.0,
+            })
 
         if settings.cerebras_api_key:
-            providers.append({
+            # Cerebras as additional option for both tiers
+            cerebras_config = {
                 "name": "cerebras",
                 "base_url": "https://api.cerebras.ai/v1",
                 "api_key": settings.cerebras_api_key,
-                "model": "gpt-oss-120b",
+                "model": "gemma-4-31b",
                 "max_rpm": 5,
-                "min_interval": 12.0,  # 5 req/min = 12s between requests
-            })
-
-        if settings.groq_api_key:
-            providers.append({
-                "name": "groq",
-                "base_url": "https://api.groq.com/openai/v1",
-                "api_key": settings.groq_api_key,
-                "model": "mixtral-8x7b-32768",
-                "max_rpm": 20,
-                "min_interval": 3.0,
-            })
+                "min_interval": 12.0,
+            }
+            fast_providers.append(cerebras_config)
+            smart_providers.append(cerebras_config)
 
         if settings.together_api_key:
-            providers.append({
+            together_config = {
                 "name": "together",
                 "base_url": "https://api.together.xyz/v1",
                 "api_key": settings.together_api_key,
                 "model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
                 "max_rpm": 10,
                 "min_interval": 6.0,
-            })
+            }
+            smart_providers.append(together_config)
 
-        return providers
+        return {
+            TASK_TIER_FAST: fast_providers,
+            TASK_TIER_SMART: smart_providers,
+        }
 
     async def generate(
         self,
@@ -71,26 +92,31 @@ class LLMRouter:
         temperature: float = 0.1,
         json_mode: bool = True,
         max_tokens: int = 2048,
+        tier: str = TASK_TIER_FAST,
     ) -> Dict[str, Any]:
         """
-        Generate a response from the best available provider.
+        Generate a response using the appropriate tier.
 
-        Returns dict with keys: provider, response, usage
+        tier="fast" → Llama 3.1 8B (extraction, JSON tasks)
+        tier="smart" → GPT-OSS 20B (reasoning, answers, hallucination)
         """
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        # Try each cloud provider in priority order
-        for provider in self.providers:
+        # Get providers for the requested tier
+        providers = self.providers.get(tier, self.providers[TASK_TIER_FAST])
+
+        # Try each provider in order
+        for provider in providers:
             try:
                 result = await self._call_provider(
                     provider, messages, temperature, json_mode, max_tokens
                 )
                 if result is not None:
                     return {
-                        "provider": provider["name"],
+                        "provider": f"{provider['name']} ({provider['model']})",
                         "response": result,
                     }
             except Exception as e:
@@ -98,7 +124,7 @@ class LLMRouter:
                 continue
 
         # Fallback to Ollama
-        logger.info("All cloud providers failed, falling back to Ollama")
+        logger.info(f"All {tier} providers failed, falling back to Ollama")
         return await self._call_ollama(prompt, system_prompt, json_mode)
 
     async def _call_provider(
@@ -118,6 +144,7 @@ class LLMRouter:
         wait = provider["min_interval"] - (now - last)
         if wait > 0:
             import asyncio
+
             await asyncio.sleep(wait)
 
         headers = {
@@ -178,7 +205,9 @@ class LLMRouter:
                 async with session.post(self.ollama_url, json=payload) as resp:
                     if resp.status != 200:
                         body = await resp.text()
-                        raise RuntimeError(f"Ollama returned {resp.status}: {body[:200]}")
+                        raise RuntimeError(
+                            f"Ollama returned {resp.status}: {body[:200]}"
+                        )
 
                     data = await resp.json()
                     response_text = data.get("response", "")

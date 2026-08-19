@@ -81,6 +81,7 @@ Generate an answer using ONLY the facts above."""
                 system_prompt=ANSWER_SYSTEM_PROMPT,
                 temperature=0.3,
                 json_mode=True,
+                tier="smart",  # Answer generation needs reasoning
             )
 
             return self._parse_answer(result, facts)

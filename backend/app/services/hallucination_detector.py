@@ -129,6 +129,7 @@ Extract all atomic factual claims from this answer."""
                 system_prompt=CLAIM_EXTRACTION_PROMPT,
                 temperature=0.1,
                 json_mode=True,
+                tier="smart",  # Claim extraction needs reasoning
             )
 
             response = result["response"]

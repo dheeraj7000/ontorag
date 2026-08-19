@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # Ollama (local fallback)
     ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1:8b"
+    ollama_model: str = "qwen2:0.5b"
 
     # Neo4j
     neo4j_uri: str = "bolt://localhost:7687"
