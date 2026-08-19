@@ -77,7 +77,7 @@ class OntologyGuidedExtractor:
     def __init__(self, llm_router: Optional[LLMRouter] = None):
         self.llm = llm_router or LLMRouter()
         self.ontology = load_ontology()
-        self._rate_limit_delay = 2.0  # seconds between API calls
+        self._rate_limit_delay = 13.0  # seconds between API calls (5 req/min limit)
 
     async def extract_from_chunk(
         self, text: str, chunk_index: int, source_document: str

@@ -38,8 +38,8 @@ class LLMRouter:
                 "base_url": "https://api.cerebras.ai/v1",
                 "api_key": settings.cerebras_api_key,
                 "model": "llama3.1-70b",
-                "max_rpm": 30,
-                "min_interval": 2.0,  # seconds between requests
+                "max_rpm": 5,
+                "min_interval": 12.0,  # 5 req/min = 12s between requests
             })
 
         if settings.groq_api_key:
