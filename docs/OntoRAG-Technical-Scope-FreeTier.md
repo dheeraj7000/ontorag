@@ -1,10 +1,10 @@
 # OntoRAG: Technical Scope & Execution Plan (FREE TIER EDITION)
 ## Ontology-Grounded RAG with GNN Trust Scoring — Zero-Cost Deployment
 
-**Version:** 2.0 (Free Tier Optimized)  
+**Version:** 2.1 (Deployed & Live)  
 **Author:** Dheeraj Kumar  
 **Target:** AI/ML Engineer (LLM/Agentic Focus) Portfolio Project  
-**Live URL:** `ontorag.yourdomain.com`  
+**Live URL:** http://32.195.248.147  
 **GitHub:** `github.com/dheeraj7000/ontorag`
 
 ---
@@ -38,16 +38,18 @@ OntoRAG is a production-ready RAG system that:
 | Layer | Technology | Purpose | Cost |
 |-------|-----------|---------|------|
 | **Backend** | FastAPI (Python 3.11+) | API server | FREE (self-hosted) |
-| **LLM** | **Cerebras / Groq / Together AI** (free tiers) | Entity extraction, answering, claim extraction | **FREE** (see limits below) |
+| **LLM (Fast)** | **Groq (Llama 3.1 8B)** | Entity extraction, JSON tasks | **FREE** |
+| **LLM (Smart)** | **Groq (GPT-OSS 20B)** | Answer generation, reasoning, hallucination | **FREE** |
 | **Embeddings** | sentence-transformers (`all-MiniLM-L6-v2`) | Local embeddings, no API cost | FREE (CPU) |
-| **Fallback LLM** | Ollama (Llama 3.1 8B) | Local LLM when APIs rate-limited | FREE (your machine) |
+| **Fallback LLM** | Ollama (qwen2:0.5b) | Local LLM when APIs rate-limited | FREE (EC2) |
 | **Graph DB** | Neo4j Community Edition (local/Docker) | Knowledge graph storage | FREE |
 | **GNN** | PyTorch Geometric 2.5+ | Trust scoring model | FREE (CPU) |
 | **Vector DB** | ChromaDB (local) OR Neo4j GDS | Semantic search fallback | FREE |
 | **Frontend** | React 18 + Vite + Cytoscape.js | Dashboard | FREE |
-| **Deployment** | **AWS EC2 t2.micro** (free 750 hrs/mo) + Docker | Production hosting | **FREE** |
-| **File Storage** | Local filesystem (EC2) OR AWS S3 (5GB free) | Document storage | FREE |
-| **CI/CD** | GitHub Actions (2,000 min/mo free) | Auto-deploy | FREE |
+| **Deployment** | **AWS EC2 t2.micro** (Terraform) + Nginx + systemd | Production hosting | **FREE** |
+| **File Storage** | Local filesystem (EC2 EBS 30GB) + AWS S3 (5GB free) | Document storage | FREE |
+| **IaC** | Terraform | One-command deploy/destroy | FREE |
+| **Monitoring** | systemd journald + Docker logs | Logs/metrics | FREE |
 | **Monitoring** | Docker logs + Prometheus (free) OR CloudWatch (basic) | Logs/metrics | FREE |
 | **Domain** | Namecheap / Cloudflare | Custom domain | ~$12/year |
 
@@ -55,7 +57,34 @@ OntoRAG is a production-ready RAG system that:
 
 ---
 
-## 3. FREE LLM API STRATEGY
+## 3. TWO-TIER LLM ROUTING STRATEGY
+
+### 3.1 Design Principle
+
+Instead of sending all tasks to one expensive model, OntoRAG routes by task complexity:
+
+| Tier | Model | Use Case | Why |
+|------|-------|----------|-----|
+| **Fast** | Llama 3.1 8B (Groq) | Entity extraction, JSON parsing | High volume, structured output, doesn't need deep reasoning |
+| **Smart** | GPT-OSS 20B (Groq) | Answer generation, hallucination detection | Needs reasoning, synthesis, and nuanced understanding |
+| **Fallback** | qwen2:0.5b (Ollama on EC2) | All tasks when APIs unavailable | Unlimited, no internet needed, fits in 1GB RAM |
+
+### 3.2 Token Economics
+
+| Operation | Input Tokens | Output Tokens | Tier | Cost per Op |
+|-----------|-------------|---------------|------|-------------|
+| Extract entities from 1 chunk | ~1,300 | ~500 | Fast | ~$0.0001 |
+| Ingest 1 document (6 chunks) | ~7,800 | ~3,000 | Fast | ~$0.0005 |
+| Generate answer | ~550 | ~200 | Smart | ~$0.0002 |
+| Check hallucination | ~500 | ~300 | Smart | ~$0.0002 |
+
+**Daily capacity on Groq free tier:** ~100 document ingestions or ~1,300 queries
+
+### 3.3 Implementation
+
+See `backend/app/core/llm_router.py` — the `tier` parameter controls routing:
+- `tier="fast"` → extraction pipeline
+- `tier="smart"` → answer generation, hallucination detection
 
 ### 3.1 Recommended Free Tier APIs (Ranked)
 

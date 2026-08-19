@@ -2,7 +2,7 @@
 
 A production-ready Retrieval-Augmented Generation system that grounds retrieval in a domain ontology, scores fact trustworthiness using Graph Neural Networks, detects hallucinations by cross-checking against the knowledge graph, and explains every answer via provenance visualization.
 
-**Live:** `ontorag.yourdomain.com` | **Cost:** $0/month (free tier stack)
+**Live:** http://32.195.248.147 | **Cost:** $0/month (free tier stack)
 
 ---
 
@@ -13,7 +13,10 @@ A production-ready Retrieval-Augmented Generation system that grounds retrieval 
 │  React 18 + Vite + Cytoscape.js (Frontend)                         │
 ├────────────────────────────────────────────────────────────────────┤
 │  FastAPI Backend                                                    │
-│  ├─ LLM Router: Cerebras → Groq → Together → Ollama (fallback)    │
+│  ├─ Two-Tier LLM Router:                                           │
+│  │   ├─ Fast (Llama 3.1 8B) → extraction, JSON tasks              │
+│  │   ├─ Smart (GPT-OSS 20B) → reasoning, answers, hallucination   │
+│  │   └─ Fallback (Ollama) → offline, unlimited                     │
 │  ├─ Ingestion Pipeline: parse → chunk → extract → validate → KG   │
 │  ├─ Retriever: entity linking → ontology traversal → trust filter  │
 │  ├─ GNN Trust Scoring: 2-layer GAT (PyTorch Geometric, CPU)       │
@@ -24,6 +27,11 @@ A production-ready Retrieval-Augmented Generation system that grounds retrieval 
 │  ├─ Entities: System, Component, API, Concept, Technology, etc.    │
 │  ├─ Relations: DEPENDS_ON, USES, HAS_API, IMPLEMENTS, etc.         │
 │  └─ Provenance: source_document, chunk_index, trust_score          │
+├────────────────────────────────────────────────────────────────────┤
+│  AWS EC2 t2.micro (Free Tier) + Terraform IaC                      │
+│  ├─ Docker (Neo4j), Nginx (reverse proxy), systemd (API)          │
+│  ├─ Ollama (local LLM fallback on EC2)                             │
+│  └─ S3 bucket (document storage)                                   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -33,8 +41,8 @@ A production-ready Retrieval-Augmented Generation system that grounds retrieval 
 - **GNN Trust Scoring** — 2-layer GAT propagates confidence through the graph via message passing
 - **Hallucination Detection** — Extracts atomic claims from answers and cross-references against the KG
 - **Explainable Answers** — Every fact includes provenance (source document, chunk, confidence)
-- **Multi-Provider LLM Router** — Automatic fallback across Cerebras, Groq, Together AI, and local Ollama
-- **Zero-Cost Deployment** — Runs entirely on free tiers (AWS EC2 t2.micro + free LLM APIs)
+- **Two-Tier LLM Router** — Llama 3.1 8B for cheap extraction, GPT-OSS 20B for reasoning, Ollama fallback
+- **Zero-Cost Deployment** — Terraform IaC deploys to AWS EC2 free tier with one command
 - **Evaluation Framework** — Built-in benchmark with faithfulness, relevance, precision, and recall metrics
 
 ---
@@ -46,14 +54,14 @@ A production-ready Retrieval-Augmented Generation system that grounds retrieval 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | 3.11+ | Core backend language |
-| Docker & Docker Compose | Latest | For Neo4j and production deploy |
+| Docker & Docker Compose | Latest | For Neo4j |
 | Node.js | 18+ | Frontend build |
-| Git | Latest | Version control |
+| Terraform | 1.5+ | AWS deployment (optional) |
+| AWS CLI | 2.x | AWS deployment (optional) |
 
-You also need **at least one** of:
-- A free Cerebras API key ([signup](https://inference.cerebras.ai/))
-- A free Groq API key ([signup](https://console.groq.com/))
-- Ollama installed locally ([install](https://ollama.com/))
+You need **at least one** LLM provider:
+- A free Groq API key ([signup](https://console.groq.com/)) — recommended
+- Ollama installed locally ([install](https://ollama.com/)) — offline fallback
 
 ### Step 1: Clone the Repository
 
@@ -62,21 +70,11 @@ git clone https://github.com/dheeraj7000/ontorag.git
 cd ontorag
 ```
 
-### Step 2: Get Free LLM API Keys
+### Step 2: Get Groq API Key (Free)
 
-| Provider | Signup URL | What You Get |
-|----------|-----------|--------------|
-| **Cerebras** (recommended) | https://inference.cerebras.ai/ | Unlimited calls, 30 req/min, Llama 3.1 70B |
-| **Groq** (backup) | https://console.groq.com/ | $5/mo credits, 20 req/min, Mixtral 8x7B |
-| **Together AI** (optional) | https://api.together.xyz/ | $5 signup credit |
-| **Ollama** (local fallback) | https://ollama.com/ | Truly unlimited, runs offline |
-
-For Ollama (no internet required):
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.1:8b
-ollama serve  # Runs on localhost:11434
-```
+1. Go to https://console.groq.com/keys
+2. Create a new API key
+3. You get access to Llama 3.1 8B (fast) + GPT-OSS 20B (smart) for free
 
 ### Step 3: Configure Environment
 
@@ -84,11 +82,11 @@ ollama serve  # Runs on localhost:11434
 cp .env.example .env
 ```
 
-Edit `.env` with your API keys:
+Edit `.env`:
 ```bash
-CEREBRAS_API_KEY=csk-xxxxxxxxxxxxxxxx
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxx
-# TOGETHER_API_KEY=         # Optional
+GROQ_API_KEY=gsk_your_key_here
+CEREBRAS_API_KEY=          # Optional (if you have one)
+TOGETHER_API_KEY=          # Optional
 
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
@@ -103,30 +101,23 @@ LOG_LEVEL=INFO
 ```bash
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+source venv/bin/activate
 
 # Install dependencies
 pip install -r backend/requirements.txt
 pip install -r backend/requirements-dev.txt
 
-# For GNN trust scoring (optional, heavier install):
+# Optional: GNN trust scoring
 pip install torch torch-geometric
 
-# For embedding-based entity linking (optional):
+# Optional: Embedding-based entity linking
 pip install sentence-transformers
 ```
 
 ### Step 5: Start Neo4j
 
 ```bash
-docker-compose up -d neo4j
-```
-
-Wait ~15 seconds for Neo4j to become healthy, then verify:
-```bash
-# Neo4j Browser available at http://localhost:7474
-# Default credentials: neo4j / password
+docker compose up -d neo4j
 ```
 
 ### Step 6: Run the Backend
@@ -141,29 +132,37 @@ curl http://localhost:8000/health
 # {"status":"ok","service":"ontorag","version":"0.1.0","environment":"development"}
 ```
 
-### Step 7: Frontend Setup
+### Step 7: Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# Dashboard available at http://localhost:3000
-```
-
-To build for production:
-```bash
-npm run build
-# Static files output to frontend/dist/
+# Dashboard at http://localhost:3000
 ```
 
 ### Step 8: Run Tests
 
 ```bash
-# From project root
 pytest backend/tests/ -v
+# 31 tests pass without Neo4j or LLM APIs
 ```
 
-All 31 tests should pass without Neo4j or LLM APIs running (they're mocked/gracefully handled in tests).
+---
+
+## Two-Tier LLM Routing
+
+The router automatically selects the right model based on task complexity:
+
+| Tier | Model | Tasks | Cost | Speed |
+|------|-------|-------|------|-------|
+| **Fast** | Llama 3.1 8B (Groq) | Entity extraction, JSON parsing | ~$0.05/1M tokens | ~0.5s |
+| **Smart** | GPT-OSS 20B (Groq) | Answer generation, reasoning, hallucination detection | ~$0.20/1M tokens | ~2s |
+| **Fallback** | Ollama (local) | All tasks when APIs unavailable | $0 | ~30s |
+
+**Token usage per document ingestion:** ~10,000 tokens (5-10 chunks × ~1,300 input + ~500 output each)
+**Token usage per query:** ~750 tokens (context assembly + answer generation)
+**Daily budget on Groq free tier:** ~100 document ingestions or ~1,300 queries
 
 ---
 
@@ -176,14 +175,12 @@ curl -X POST http://localhost:8000/api/v1/ingest/ \
   -F "file=@your_document.md"
 ```
 
-Or use the dashboard at `http://localhost:3000/ingest`.
-
 ### Query the Knowledge Graph
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query/ \
   -H "Content-Type: application/json" \
-  -d '{"question": "What web framework does OntoRAG use?", "min_trust": 0.5}'
+  -d '{"question": "What technologies does OntoRAG use?", "min_trust": 0.5}'
 ```
 
 ### Check for Hallucinations
@@ -208,79 +205,49 @@ curl -X POST "http://localhost:8000/api/v1/eval/run?approach=both"
 
 ---
 
-## Production Deployment (AWS EC2 Free Tier)
+## Production Deployment (Terraform)
 
-### 1. Launch EC2 Instance
-
-- AMI: Amazon Linux 2023 or Ubuntu 22.04
-- Instance type: t2.micro (1 vCPU, 1 GB RAM — free tier)
-- Storage: 30 GB EBS (free tier)
-- Security group: open ports 22, 80, 443, 7687, 8000
-
-### 2. Install Docker on EC2
+One-command deployment to AWS EC2 free tier:
 
 ```bash
-ssh -i your-key.pem ec2-user@your-ec2-ip
+cd infra
 
-# Amazon Linux
-sudo yum update -y
-sudo yum install docker -y
-sudo service docker start
-sudo usermod -a -G docker ec2-user
+# Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
 
-# Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-  -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# Deploy
+terraform init
+terraform apply
 ```
 
-### 3. Deploy
+This creates:
+- EC2 t2.micro (free tier, 12 months)
+- VPC + Security Group (SSH, HTTP, HTTPS restricted)
+- Elastic IP (stable address)
+- S3 bucket (document storage)
+- Auto-installs Docker, Neo4j, Ollama, Nginx, and the app
+
+**Tear down:** `terraform destroy`
+
+### Post-Deploy Setup
 
 ```bash
-git clone https://github.com/dheeraj7000/ontorag.git
-cd ontorag
-cp .env.example .env
-# Edit .env with production API keys
+# SSH in
+ssh -i ~/.ssh/ontorag-key.pem ubuntu@<PUBLIC_IP>
 
-# Build frontend
-cd frontend && npm install && npm run build && cd ..
-
-# Start all services
-docker-compose -f docker-compose.prod.yml up -d
+# Set your Groq key
+echo "GROQ_API_KEY=gsk_your_key" >> ~/ontorag/.env
+sudo systemctl restart ontorag-api
 ```
 
-### 4. Set Up Domain & SSL (Free via Cloudflare)
+### Memory (t2.micro = 1GB RAM)
 
-1. Buy domain on Namecheap (~$12/year)
-2. Point nameservers to Cloudflare (free plan)
-3. Add DNS A record: `ontorag` → your EC2 public IP
-4. Enable SSL/TLS mode: Flexible (free SSL termination)
-5. Turn on "Always Use HTTPS"
-
-### 5. Memory Optimization (t2.micro)
-
-If running tight on 1 GB RAM, add swap:
-```bash
-sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
-```
-
----
-
-## CI/CD (GitHub Actions)
-
-Configured in `.github/workflows/deploy.yml`. On push to `main`:
-1. Runs linter (ruff)
-2. Runs tests (pytest)
-3. Builds and pushes Docker image to Docker Hub
-4. SSHs into EC2 and pulls the latest image
-
-Required GitHub Secrets:
-- `DOCKER_USERNAME` / `DOCKER_PASSWORD`
-- `EC2_PRIVATE_KEY` / `EC2_HOST` / `EC2_USER`
+The instance includes 2GB swap. Services are tuned for low memory:
+- Neo4j: 400MB limit
+- FastAPI: ~100MB
+- Ollama: uses qwen2:0.5b (352MB) as fallback
+- Nginx: ~10MB
 
 ---
 
@@ -301,7 +268,7 @@ Required GitHub Secrets:
 | POST | `/api/v1/eval/run` | Run evaluation benchmark |
 | GET | `/api/v1/eval/dataset` | Benchmark dataset info |
 
-Interactive API docs: `http://localhost:8000/docs`
+Interactive API docs: http://32.195.248.147/docs
 
 ---
 
@@ -311,55 +278,37 @@ Interactive API docs: `http://localhost:8000/docs`
 ontorag/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/endpoints/       # Route handlers (ingest, query, graph, trust, hallucination, eval)
-│   │   ├── core/                   # Config, LLM router, ontology schema, Neo4j connection
+│   │   ├── api/v1/endpoints/       # Route handlers
+│   │   ├── core/                   # Config, LLM router, ontology, Neo4j
 │   │   ├── evaluation/             # Benchmark runner, dataset, metrics
-│   │   ├── models/                 # Pydantic schemas
 │   │   └── services/               # Business logic
-│   │       ├── answer_generator.py # Trust-filtered answer generation
-│   │       ├── chunker.py          # Text chunking (500 tokens, 50 overlap)
-│   │       ├── document_parser.py  # PDF/MD/HTML/TXT parsing
-│   │       ├── extractor.py        # Schema-guided entity/relation extraction
-│   │       ├── gnn_trust.py        # GAT model + trust scoring pipeline
-│   │       ├── hallucination_detector.py  # Claim extraction + KG cross-check
-│   │       ├── ingestion_pipeline.py      # Full document-to-KG orchestration
-│   │       ├── kg_builder.py       # Neo4j MERGE + provenance tracking
-│   │       └── retriever.py        # Entity linking + ontology-guided traversal
+│   │       ├── answer_generator.py # Trust-filtered answers (smart tier)
+│   │       ├── chunker.py          # 500 tokens, 50 overlap
+│   │       ├── document_parser.py  # PDF/MD/HTML/TXT
+│   │       ├── extractor.py        # Schema-guided extraction (fast tier)
+│   │       ├── gnn_trust.py        # GAT model + scoring pipeline
+│   │       ├── hallucination_detector.py  # Claim extraction (smart tier)
+│   │       ├── ingestion_pipeline.py      # Document-to-KG orchestration
+│   │       ├── kg_builder.py       # Neo4j MERGE + provenance
+│   │       └── retriever.py        # Entity linking + traversal
 │   ├── tests/                      # 31 tests (pytest)
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── requirements-dev.txt
+│   └── requirements.txt
 ├── frontend/
-│   ├── src/
-│   │   ├── pages/                  # Query, Ingest, Graph, Trust pages
-│   │   ├── api.ts                  # Typed API client
-│   │   ├── App.tsx                 # Router + layout
-│   │   └── index.css               # Dark theme styles
-│   ├── package.json
+│   ├── src/pages/                  # Query, Ingest, Graph, Trust pages
+│   ├── src/api.ts                  # Typed API client
 │   └── vite.config.ts
+├── infra/
+│   ├── main.tf                     # Terraform (VPC, EC2, S3, EIP)
+│   ├── variables.tf                # Configurable parameters
+│   ├── outputs.tf                  # Public IP, SSH command, URLs
+│   └── user_data.sh               # EC2 bootstrap script
 ├── docs/
-│   └── OntoRAG-Technical-Scope-FreeTier.md  # Full technical spec
-├── models/                         # Saved GNN weights (.pt files)
-├── docker-compose.yml              # Local development (backend + Neo4j + ChromaDB)
-├── docker-compose.prod.yml         # Production (EC2 with memory limits)
-├── nginx.conf                      # Reverse proxy for frontend + API
-├── Makefile                        # Dev shortcuts (make dev, make test, etc.)
-├── .github/workflows/deploy.yml    # CI/CD pipeline
-└── .env.example                    # Environment variable template
+│   └── OntoRAG-Technical-Scope-FreeTier.md
+├── docker-compose.yml              # Local dev
+├── docker-compose.prod.yml         # Production
+├── nginx.conf                      # Reverse proxy
+└── Makefile                        # Dev shortcuts
 ```
-
----
-
-## LLM Providers
-
-The LLM Router (`backend/app/core/llm_router.py`) tries providers in priority order with automatic failover:
-
-| Priority | Provider | Model | Rate Limit | Cost |
-|----------|----------|-------|------------|------|
-| 1 | Cerebras | Llama 3.1 70B | 30 req/min | Free |
-| 2 | Groq | Mixtral 8x7B | 20 req/min | Free ($5/mo credits) |
-| 3 | Together AI | Llama 3.1 70B | 10 req/min | Free ($5 signup) |
-| 4 | Ollama | Llama 3.1 8B | Unlimited | Free (local) |
 
 ---
 
@@ -368,20 +317,22 @@ The LLM Router (`backend/app/core/llm_router.py`) tries providers in priority or
 | Component | Technology |
 |-----------|-----------|
 | Backend | FastAPI, Python 3.11+ |
-| Graph Database | Neo4j Community Edition 5.x |
-| GNN Framework | PyTorch Geometric (GAT) |
+| Graph Database | Neo4j Community 5.x (Docker) |
+| GNN | PyTorch Geometric (2-layer GAT, CPU) |
 | Embeddings | sentence-transformers (all-MiniLM-L6-v2) |
+| LLM (Fast) | Llama 3.1 8B via Groq |
+| LLM (Smart) | GPT-OSS 20B via Groq |
+| LLM (Fallback) | Ollama (qwen2:0.5b on EC2) |
 | Frontend | React 18, Vite, Cytoscape.js |
-| Deployment | AWS EC2 t2.micro, Docker Compose, Nginx |
-| CI/CD | GitHub Actions |
+| Infrastructure | Terraform, AWS EC2 t2.micro |
+| Reverse Proxy | Nginx |
 | SSL | Cloudflare (free) |
 
 ---
 
 ## Documentation
 
-Full technical specification with execution phases, architecture diagrams, and deployment details:
-
+Full technical specification:
 **[docs/OntoRAG-Technical-Scope-FreeTier.md](docs/OntoRAG-Technical-Scope-FreeTier.md)**
 
 ---
