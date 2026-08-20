@@ -32,5 +32,5 @@ def test_router_builds_tiered_providers():
         # Groq provides both fast and smart
         assert len(router.providers[TASK_TIER_FAST]) == 1
         assert len(router.providers[TASK_TIER_SMART]) == 1
-        assert router.providers[TASK_TIER_FAST][0]["model"] == "llama-3.1-8b-instant"
-        assert router.providers[TASK_TIER_SMART][0]["model"] == "gpt-oss-20b"
+        assert router.providers[TASK_TIER_FAST][0]["model"] == "openai/gpt-oss-20b"
+        assert router.providers[TASK_TIER_SMART][0]["model"] == "openai/gpt-oss-120b"

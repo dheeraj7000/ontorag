@@ -1,8 +1,8 @@
 """
 LLM Router — two-tier routing for cost/quality optimization.
 
-Tier 1 (Fast/Cheap): Llama 3.1 8B on Groq — extraction, simple JSON tasks
-Tier 2 (Smart): GPT-OSS 20B on Groq — reasoning, answer generation, hallucination detection
+Tier 1 (Fast/Cheap): GPT-OSS 20B on Groq — extraction, simple JSON tasks (~1000 tps)
+Tier 2 (Smart): GPT-OSS 120B on Groq — reasoning, answer generation, hallucination detection (~500 tps)
 
 Fallback: Ollama (local, unlimited, no internet needed)
 """
@@ -37,21 +37,21 @@ class LLMRouter:
         smart_providers = []
 
         if settings.groq_api_key:
-            # Tier 1: Fast/cheap for extraction
+            # Tier 1: Fast/cheap for extraction (~1000 tps)
             fast_providers.append({
                 "name": "groq-fast",
                 "base_url": "https://api.groq.com/openai/v1",
                 "api_key": settings.groq_api_key,
-                "model": "llama-3.1-8b-instant",
+                "model": "openai/gpt-oss-20b",
                 "max_rpm": 30,
                 "min_interval": 2.0,
             })
-            # Tier 2: Smart for reasoning
+            # Tier 2: Smart for reasoning (~500 tps)
             smart_providers.append({
                 "name": "groq-smart",
                 "base_url": "https://api.groq.com/openai/v1",
                 "api_key": settings.groq_api_key,
-                "model": "gpt-oss-20b",
+                "model": "openai/gpt-oss-120b",
                 "max_rpm": 15,
                 "min_interval": 4.0,
             })
@@ -97,8 +97,8 @@ class LLMRouter:
         """
         Generate a response using the appropriate tier.
 
-        tier="fast" → Llama 3.1 8B (extraction, JSON tasks)
-        tier="smart" → GPT-OSS 20B (reasoning, answers, hallucination)
+        tier="fast" → GPT-OSS 20B (extraction, JSON tasks)
+        tier="smart" → GPT-OSS 120B (reasoning, answers, hallucination)
         """
         messages = []
         if system_prompt:
