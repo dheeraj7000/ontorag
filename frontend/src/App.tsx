@@ -1,32 +1,43 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
-import QueryPage from './pages/QueryPage'
-import IngestPage from './pages/IngestPage'
-import GraphPage from './pages/GraphPage'
-import TrustPage from './pages/TrustPage'
+import { useCallback, useEffect, useState } from 'react'
+import Hero from './components/Hero'
+import UploadPanel from './components/UploadPanel'
+import KnowledgeGraph from './components/KnowledgeGraph'
+import TrustTools from './components/TrustTools'
+import QueryPanel from './components/QueryPanel'
+import { getGraphStats, type GraphStats } from './api'
 
 function App() {
+  const [stats, setStats] = useState<GraphStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await getGraphStats()
+      setStats(data)
+    } catch {
+      // Backend may not be reachable yet — hero just shows placeholders.
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
+
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="sidebar-logo">🧠 OntoRAG</div>
-        <nav className="sidebar-nav">
-          <NavLink to="/" end><span className="nav-icon">🔍</span>Query</NavLink>
-          <NavLink to="/ingest"><span className="nav-icon">📥</span>Ingest</NavLink>
-          <NavLink to="/graph"><span className="nav-icon">🕸️</span>Graph</NavLink>
-          <NavLink to="/trust"><span className="nav-icon">🛡️</span>Trust</NavLink>
-        </nav>
-        <div className="sidebar-footer">Ontology-grounded RAG</div>
-      </aside>
-      <main className="main-content">
-        <div className="page">
-          <Routes>
-            <Route path="/" element={<QueryPage />} />
-            <Route path="/ingest" element={<IngestPage />} />
-            <Route path="/graph" element={<GraphPage />} />
-            <Route path="/trust" element={<TrustPage />} />
-          </Routes>
+    <div className="shell">
+      <div className="layout-grid">
+        <div className="main-col">
+          <Hero stats={stats} loading={statsLoading} />
+          <UploadPanel onIngested={loadStats} />
+          <KnowledgeGraph />
+          <TrustTools />
         </div>
-      </main>
+        <div className="side-col">
+          <QueryPanel />
+        </div>
+      </div>
     </div>
   )
 }

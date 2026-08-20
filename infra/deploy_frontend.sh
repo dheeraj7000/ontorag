@@ -9,9 +9,9 @@ KEY="${ONTORAG_SSH_KEY:-$HOME/.ssh/ontorag-key-west.pem}"
 cd "$(dirname "$0")/../frontend"
 npm run build
 
-ssh -i "$KEY" "$HOST" "rm -rf /tmp/ontorag_dist_new && mkdir -p /tmp/ontorag_dist_new"
-scp -i "$KEY" -r dist/* "$HOST:/tmp/ontorag_dist_new/"
-ssh -i "$KEY" "$HOST" '
+ssh -o StrictHostKeyChecking=accept-new -i "$KEY" "$HOST" "rm -rf /tmp/ontorag_dist_new && mkdir -p /tmp/ontorag_dist_new"
+scp -o StrictHostKeyChecking=accept-new -i "$KEY" -r dist/* "$HOST:/tmp/ontorag_dist_new/"
+ssh -o StrictHostKeyChecking=accept-new -i "$KEY" "$HOST" '
   sudo cp -r /tmp/ontorag_dist_new /var/www/ontorag_new &&
   sudo chown -R www-data:www-data /var/www/ontorag_new &&
   sudo rm -rf /var/www/ontorag_old &&
