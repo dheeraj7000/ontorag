@@ -116,6 +116,16 @@ export async function getSubgraph(entityName: string, hops = 2) {
   return data
 }
 
+export interface GraphElements {
+  nodes: Array<{ id: string; name: string; entity_type: string; trust_score: number }>
+  edges: Array<{ source: string; target: string; type: string; trust_score: number | null }>
+}
+
+export async function getFullGraph(limit = 150): Promise<GraphElements> {
+  const { data } = await api.get('/graph/full', { params: { limit } })
+  return data
+}
+
 export async function checkHallucination(answer: string): Promise<HallucinationResponse> {
   const { data } = await api.post('/hallucination/check', { answer })
   return data

@@ -69,6 +69,50 @@ async def list_entities(
         return {"entities": [], "total": 0, "error": str(e)}
 
 
+@router.get("/full")
+async def get_full_graph(limit: int = 150):
+    """
+    Get the whole knowledge graph (up to `limit` highest-trust nodes) in the
+    same {nodes, edges} shape as /subgraph, for an initial full-graph view
+    rather than requiring the user to pick an entity first.
+    """
+    try:
+        await db.connect()
+        limit = max(1, min(limit, 500))
+
+        cypher = """
+        MATCH (n:Entity)
+        WITH n ORDER BY n.trust_score DESC LIMIT $limit
+        WITH COLLECT(n) as nodes
+        UNWIND nodes as node
+        WITH nodes, COLLECT({
+            id: elementId(node),
+            name: node.name,
+            entity_type: node.entity_type,
+            trust_score: node.trust_score
+        }) as node_data
+        OPTIONAL MATCH (a:Entity)-[r]->(b:Entity)
+        WHERE a IN nodes AND b IN nodes
+        RETURN node_data as nodes,
+               COLLECT(DISTINCT CASE WHEN r IS NULL THEN NULL ELSE {
+                   source: elementId(a),
+                   target: elementId(b),
+                   type: type(r),
+                   trust_score: r.trust_score
+               } END) as edges
+        """
+
+        results = await db.execute_query(cypher, {"limit": limit})
+        if not results:
+            return {"nodes": [], "edges": []}
+
+        edges = [e for e in (results[0]["edges"] or []) if e is not None]
+        return {"nodes": results[0]["nodes"] or [], "edges": edges}
+    except Exception as e:
+        logger.warning(f"Could not fetch full graph: {e}")
+        return {"nodes": [], "edges": [], "error": str(e)}
+
+
 @router.get("/subgraph/{entity_name}")
 async def get_subgraph(entity_name: str, hops: int = 2):
     """
