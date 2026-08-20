@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from backend.app.core.llm_router import LLMRouter, TASK_TIER_FAST, TASK_TIER_SMART
+from backend.app.core.llm_router import TASK_TIER_FAST, TASK_TIER_SMART, LLMRouter
 
 
 def test_router_initializes_with_no_keys():

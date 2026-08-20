@@ -7,8 +7,8 @@ echo "=== Docker Containers ==="
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo ""
 
-echo "=== .env ==="
-cat ~/ontorag/.env
+echo "=== .env (secrets redacted) ==="
+sed -E 's/(_KEY|_PASSWORD|_SECRET)=.+/\1=***redacted***/' ~/ontorag/.env
 echo ""
 
 echo "=== Disk ==="

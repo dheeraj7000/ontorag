@@ -38,21 +38,15 @@ services:
       - neo4j_data:/data
       - neo4j_logs:/logs
     healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
-      interval: 10s
+      # Lightweight HTTP check instead of cypher-shell: cypher-shell spawns a
+      # fresh JVM per invocation, which adds up fast at a 10s interval.
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 30s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  chromadb:
-    image: chromadb/chroma:latest
-    ports:
-      - "8001:8000"
-    volumes:
-      - chromadb_data:/chroma/chroma
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
   neo4j_data:
   neo4j_logs:
-  chromadb_data:

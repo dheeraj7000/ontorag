@@ -60,15 +60,25 @@ cat > /tmp/ontorag-nginx << 'NGINX'
 server {
     listen 80;
     server_name _;
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/javascript application/wasm;
+    gzip_min_length 1024;
+
     location / {
         root /var/www/ontorag;
         try_files $uri $uri/ /index.html;
+    }
+    location /assets/ {
+        root /var/www/ontorag;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
     location /api/ {
         proxy_pass http://127.0.0.1:8000/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 300s;
     }
     location /health {
         proxy_pass http://127.0.0.1:8000/health;
@@ -111,13 +121,17 @@ sudo systemctl enable ontorag-api
 sudo systemctl start ontorag-api
 sleep 3
 
-# 8. Install Ollama (small model)
+# 8. Install Ollama (small model — see infra/install_ollama.sh for the rationale)
 echo "--- Installing Ollama ---"
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull qwen2:0.5b
 sudo systemctl enable ollama
+sudo systemctl start ollama
 
-# 9. Verify
+# 9. Set up HTTPS via DuckDNS + certbot (optional, do this manually):
+#    see infra/README.md for the step-by-step.
+
+# 10. Verify
 echo ""
 echo "=== VERIFICATION ==="
 curl -s http://localhost:8000/health

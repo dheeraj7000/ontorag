@@ -13,9 +13,6 @@ tiktoken==0.8.0
 # Graph Database
 neo4j==5.27.0
 
-# Vector Database
-chromadb==0.5.23
-
 # GNN (CPU)
 torch==2.5.1
 torch-geometric==2.6.1
