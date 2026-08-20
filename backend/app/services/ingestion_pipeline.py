@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
+from backend.app.core.config import settings
 from backend.app.core.database import db
 from backend.app.services.chunker import chunk_text
 from backend.app.services.document_parser import parse_document
@@ -72,12 +73,27 @@ class IngestionPipeline:
             # Step 2: Chunk text
             logger.info(f"[{file_id}] Chunking text ({len(text)} chars)")
             chunks = chunk_text(text)
-            stats.total_chunks = len(chunks)
 
             if not chunks:
                 stats.status = "error"
                 stats.errors.append("Text chunking produced no chunks")
                 return stats
+
+            # Cap chunks processed per document — this is a public,
+            # unauthenticated demo on a small instance, so an oversized
+            # document shouldn't be able to run up LLM calls or tie up the
+            # single worker indefinitely.
+            max_chunks = settings.max_chunks_per_document
+            if len(chunks) > max_chunks:
+                logger.info(
+                    f"[{file_id}] Document produced {len(chunks)} chunks, "
+                    f"capping to {max_chunks}"
+                )
+                chunks = chunks[:max_chunks]
+                stats.errors.append(
+                    f"Document truncated to the first {max_chunks} chunks (demo limit)"
+                )
+            stats.total_chunks = len(chunks)
 
             # Step 3: Connect to Neo4j and initialize schema
             try:

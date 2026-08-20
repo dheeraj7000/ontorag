@@ -43,5 +43,16 @@ class Settings(BaseSettings):
     # File storage
     upload_dir: str = "./uploads"
 
+    # Abuse/cost guardrails — this is a public, unauthenticated demo on a
+    # single small instance, so these bound worst-case cost and load rather
+    # than doing real per-user enforcement.
+    max_upload_bytes: int = 3 * 1024 * 1024  # 3MB
+    max_chunks_per_document: int = 20
+    rate_limit_per_minute: int = 20
+
+    # Demo mode: reset the knowledge graph on every page load so visitors
+    # never see a previous visitor's data (no auth/multi-tenancy yet).
+    demo_reset_enabled: bool = True
+
 
 settings = Settings()

@@ -3,10 +3,11 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from backend.app.core.database import db
+from backend.app.core.rate_limit import rate_limit
 from backend.app.services.hallucination_detector import HallucinationDetector
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,11 @@ class HallucinationCheckResponse(BaseModel):
     unsupported_claims: int = 0
 
 
-@router.post("/check", response_model=HallucinationCheckResponse)
+@router.post(
+    "/check",
+    response_model=HallucinationCheckResponse,
+    dependencies=[Depends(rate_limit("hallucination"))],
+)
 async def check_hallucination(request: HallucinationCheckRequest):
     """
     Check an answer for hallucinations by cross-referencing against the KG.

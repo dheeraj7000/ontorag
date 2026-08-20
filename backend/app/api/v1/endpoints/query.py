@@ -2,10 +2,11 @@
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from backend.app.core.database import db
+from backend.app.core.rate_limit import rate_limit
 from backend.app.services.answer_generator import AnswerGenerator
 from backend.app.services.retriever import OntologyGuidedRetriever
 
@@ -40,7 +41,7 @@ class QueryResponse(BaseModel):
     reasoning: str = ""
 
 
-@router.post("/", response_model=QueryResponse)
+@router.post("/", response_model=QueryResponse, dependencies=[Depends(rate_limit("query"))])
 async def query_knowledge_graph(request: QueryRequest):
     """
     Query the knowledge graph with ontology-guided retrieval.

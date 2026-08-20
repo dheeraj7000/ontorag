@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Hero from './components/Hero'
 import UploadPanel from './components/UploadPanel'
 import KnowledgeGraph from './components/KnowledgeGraph'
 import TrustTools from './components/TrustTools'
 import QueryPanel from './components/QueryPanel'
-import { getGraphStats, type GraphStats } from './api'
+import { getGraphStats, resetDemo, type GraphStats } from './api'
 
 function App() {
   const [stats, setStats] = useState<GraphStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [ready, setReady] = useState(false)
+  const resetOnce = useRef(false)
 
   const loadStats = useCallback(async () => {
     try {
@@ -22,8 +24,31 @@ function App() {
   }, [])
 
   useEffect(() => {
-    loadStats()
+    // Demo mode: no auth/per-user isolation yet, so every visitor shares
+    // one knowledge graph. Reset it before any child component fetches
+    // anything, so nobody sees a previous visitor's data — not even
+    // briefly while the page loads.
+    if (resetOnce.current) return
+    resetOnce.current = true
+    resetDemo()
+      .catch(() => {
+        // If the reset call fails (e.g. backend briefly down), still show
+        // the page rather than getting stuck — worst case, stale data.
+      })
+      .finally(() => {
+        setReady(true)
+        loadStats()
+      })
   }, [loadStats])
+
+  if (!ready) {
+    return (
+      <div className="shell boot-shell">
+        <span className="spinner spinner-lg" />
+        <p className="text-muted mt-3">Preparing a fresh demo…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="shell">

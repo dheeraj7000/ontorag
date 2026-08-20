@@ -2,16 +2,17 @@
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from backend.app.core.database import db
+from backend.app.core.rate_limit import rate_limit
 from backend.app.services.gnn_trust import TrustScoringPipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/compute")
+@router.post("/compute", dependencies=[Depends(rate_limit("trust", per_minute=5))])
 async def compute_trust_scores():
     """
     Trigger GNN trust score computation.

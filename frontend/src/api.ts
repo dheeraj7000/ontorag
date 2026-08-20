@@ -126,6 +126,14 @@ export async function getFullGraph(limit = 150): Promise<GraphElements> {
   return data
 }
 
+// Demo mode: there's no auth/per-user isolation yet, so every visitor
+// shares one knowledge graph. Called once on page load (see App.tsx) to
+// reset it before anything else loads, so nobody sees a previous
+// visitor's data.
+export async function resetDemo(): Promise<void> {
+  await api.post('/admin/reset')
+}
+
 export async function checkHallucination(answer: string): Promise<HallucinationResponse> {
   const { data } = await api.post('/hallucination/check', { answer })
   return data

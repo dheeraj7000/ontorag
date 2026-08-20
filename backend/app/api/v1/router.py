@@ -2,10 +2,19 @@
 
 from fastapi import APIRouter
 
-from backend.app.api.v1.endpoints import evaluation, graph, hallucination, ingest, query, trust
+from backend.app.api.v1.endpoints import (
+    admin,
+    evaluation,
+    graph,
+    hallucination,
+    ingest,
+    query,
+    trust,
+)
 
 api_router = APIRouter()
 
+api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 api_router.include_router(ingest.router, prefix="/ingest", tags=["Ingestion"])
 api_router.include_router(query.router, prefix="/query", tags=["Query"])
 api_router.include_router(

@@ -4,9 +4,10 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 
 from backend.app.core.config import settings
+from backend.app.core.rate_limit import rate_limit
 from backend.app.services.ingestion_pipeline import IngestionStats, ingestion_pipeline
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ async def _run_ingestion(file_path: Path, file_id: str, filename: str) -> None:
     _ingestion_jobs[file_id] = stats
 
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(rate_limit("ingest"))])
 async def ingest_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -44,6 +45,16 @@ async def ingest_document(
             detail=f"Unsupported file type: {ext}. Allowed: {allowed_extensions}",
         )
 
+    # Bound worst-case cost/memory on this small, unauthenticated instance —
+    # read one byte past the limit rather than the whole body before checking.
+    max_bytes = settings.max_upload_bytes
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Max upload size is {max_bytes // (1024 * 1024)}MB.",
+        )
+
     # Save uploaded file
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -52,7 +63,6 @@ async def ingest_document(
     filename = f"{file_id}{ext}"
     file_path = upload_dir / filename
 
-    content = await file.read()
     file_path.write_bytes(content)
     logger.info(f"Saved upload: {filename} ({len(content)} bytes)")
 
