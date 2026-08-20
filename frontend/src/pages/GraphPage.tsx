@@ -41,18 +41,35 @@ export default function GraphPage() {
   if (loading) {
     return (
       <div>
-        <div className="page-header"><h1>Knowledge Graph</h1></div>
-        <div className="card"><span className="spinner" /> Loading graph data...</div>
+        <div className="page-header"><div><h1>Knowledge Graph</h1></div></div>
+        <div className="card">
+          <div className="loading-state">
+            <span className="spinner" /> Loading graph data...
+          </div>
+        </div>
       </div>
     )
   }
 
+  const hasData = !!stats
+
   return (
     <div>
       <div className="page-header">
-        <h1>Knowledge Graph Explorer</h1>
-        <p>Browse entities, relations, and subgraphs</p>
+        <div>
+          <h1>Knowledge Graph Explorer</h1>
+          <p>Browse entities, relations, and subgraphs</p>
+        </div>
       </div>
+
+      {!hasData && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-icon">🕸️</div>
+            <p>No graph data available. Ingest a document to get started.</p>
+          </div>
+        </div>
+      )}
 
       {stats && (
         <div className="stats-grid">
@@ -78,9 +95,9 @@ export default function GraphPage() {
       {stats && Object.keys(stats.entity_types).length > 0 && (
         <div className="card">
           <div className="card-header">Entity Type Distribution</div>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="chip-row">
             {Object.entries(stats.entity_types).map(([type, count]) => (
-              <div key={type} style={{ padding: '0.5rem 1rem', background: 'var(--bg)', borderRadius: '0.5rem' }}>
+              <div key={type} className="chip">
                 <strong>{type}</strong>: {count}
               </div>
             ))}
@@ -90,12 +107,15 @@ export default function GraphPage() {
 
       {entities.length > 0 && (
         <div className="card">
-          <div className="card-header">Entities (click to explore subgraph)</div>
-          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', fontSize: '0.85rem' }}>
+          <div className="card-header">
+            Entities
+            <span className="card-header-meta">click a row to explore its subgraph</span>
+          </div>
+          <div className="table-scroll table-wrap">
+            <table className="table">
               <thead>
-                <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-                  <th style={{ padding: '0.5rem' }}>Name</th>
+                <tr>
+                  <th>Name</th>
                   <th>Type</th>
                   <th>Trust</th>
                 </tr>
@@ -105,14 +125,10 @@ export default function GraphPage() {
                   <tr
                     key={entity.name}
                     onClick={() => handleEntityClick(entity.name)}
-                    style={{
-                      cursor: 'pointer',
-                      borderTop: '1px solid var(--border)',
-                      background: selectedEntity === entity.name ? 'rgba(99, 102, 241, 0.1)' : undefined,
-                    }}
+                    className={`is-clickable${selectedEntity === entity.name ? ' is-selected' : ''}`}
                   >
-                    <td style={{ padding: '0.5rem' }}>{entity.name}</td>
-                    <td><span className="trust-badge trust-medium">{entity.entity_type}</span></td>
+                    <td>{entity.name}</td>
+                    <td><span className="badge">{entity.entity_type}</span></td>
                     <td>{entity.trust_score?.toFixed(2) || '—'}</td>
                   </tr>
                 ))}
@@ -126,12 +142,12 @@ export default function GraphPage() {
         <div className="card">
           <div className="card-header">
             Subgraph: {selectedEntity}
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            <span className="card-header-meta">
               {subgraph.nodes.length} nodes, {subgraph.edges.length} edges
             </span>
           </div>
-          <div className="graph-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <p style={{ color: 'var(--text-muted)' }}>
+          <div className="graph-container">
+            <p>
               Cytoscape.js visualization renders here in production.
               <br />
               Nodes: {subgraph.nodes.length} | Edges: {subgraph.edges.length}

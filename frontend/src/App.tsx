@@ -10,19 +10,22 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-logo">🧠 OntoRAG</div>
         <nav className="sidebar-nav">
-          <NavLink to="/" end>Query</NavLink>
-          <NavLink to="/ingest">Ingest</NavLink>
-          <NavLink to="/graph">Graph</NavLink>
-          <NavLink to="/trust">Trust</NavLink>
+          <NavLink to="/" end><span className="nav-icon">🔍</span>Query</NavLink>
+          <NavLink to="/ingest"><span className="nav-icon">📥</span>Ingest</NavLink>
+          <NavLink to="/graph"><span className="nav-icon">🕸️</span>Graph</NavLink>
+          <NavLink to="/trust"><span className="nav-icon">🛡️</span>Trust</NavLink>
         </nav>
+        <div className="sidebar-footer">Ontology-grounded RAG</div>
       </aside>
       <main className="main-content">
-        <Routes>
-          <Route path="/" element={<QueryPage />} />
-          <Route path="/ingest" element={<IngestPage />} />
-          <Route path="/graph" element={<GraphPage />} />
-          <Route path="/trust" element={<TrustPage />} />
-        </Routes>
+        <div className="page">
+          <Routes>
+            <Route path="/" element={<QueryPage />} />
+            <Route path="/ingest" element={<IngestPage />} />
+            <Route path="/graph" element={<GraphPage />} />
+            <Route path="/trust" element={<TrustPage />} />
+          </Routes>
+        </div>
       </main>
     </div>
   )

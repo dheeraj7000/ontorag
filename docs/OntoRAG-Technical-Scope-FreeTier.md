@@ -4,7 +4,7 @@
 **Version:** 2.1 (Deployed & Live)  
 **Author:** Dheeraj Kumar  
 **Target:** AI/ML Engineer (LLM/Agentic Focus) Portfolio Project  
-**Live URL:** http://32.195.248.147  
+**Live URL:** https://ontorag.duckdns.org  
 **GitHub:** `github.com/dheeraj7000/ontorag`
 
 ---

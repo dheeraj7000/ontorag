@@ -2,7 +2,7 @@
 LLM Router — two-tier routing for cost/quality optimization.
 
 Tier 1 (Fast/Cheap): GPT-OSS 20B on Groq — extraction, simple JSON tasks (~1000 tps)
-Tier 2 (Smart): GPT-OSS 120B on Groq — reasoning, answer generation, hallucination detection (~500 tps)
+Tier 2 (Smart): GPT-OSS 20B on Groq — reasoning, answer generation, hallucination detection (~1000 tps)
 
 Fallback: Ollama (local, unlimited, no internet needed)
 """
@@ -46,12 +46,12 @@ class LLMRouter:
                 "max_rpm": 30,
                 "min_interval": 2.0,
             })
-            # Tier 2: Smart for reasoning (~500 tps)
+            # Tier 2: Smart for reasoning (using 20B model)
             smart_providers.append({
                 "name": "groq-smart",
                 "base_url": "https://api.groq.com/openai/v1",
                 "api_key": settings.groq_api_key,
-                "model": "openai/gpt-oss-120b",
+                "model": "openai/gpt-oss-20b",
                 "max_rpm": 15,
                 "min_interval": 4.0,
             })
@@ -98,7 +98,7 @@ class LLMRouter:
         Generate a response using the appropriate tier.
 
         tier="fast" → GPT-OSS 20B (extraction, JSON tasks)
-        tier="smart" → GPT-OSS 120B (reasoning, answers, hallucination)
+        tier="smart" → GPT-OSS 20B (reasoning, answers, hallucination)
         """
         messages = []
         if system_prompt:

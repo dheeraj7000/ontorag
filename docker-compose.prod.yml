@@ -33,13 +33,21 @@ services:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
       - NEO4J_server_memory_heap_initial__size=200M
       - NEO4J_server_memory_heap_max__size=300M
+      # Pin page cache explicitly — without this Neo4j 5 auto-sizes it off
+      # total physical memory and refuses to start on a 957MB t2.micro
+      # ("Invalid memory configuration - exceeds physical memory").
+      - NEO4J_server_memory_pagecache_size=64M
     volumes:
       - neo4j_data:/data
     healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-password}", "RETURN 1"]
-      interval: 10s
+      # Lightweight HTTP check instead of cypher-shell: cypher-shell spawns a
+      # fresh JVM per invocation, which is too expensive to run every 10s on
+      # a t2.micro (was pegging CPU at 1200%+ and starving the API/Ollama).
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
     mem_limit: 400m
 

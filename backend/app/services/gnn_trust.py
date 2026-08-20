@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 MODEL_PATH = Path("models/trust_gnn.pt")
 
 
+def _num(value: Optional[Any], default: float) -> float:
+    """Coerce a possibly-None graph property to float, falling back to default.
+
+    Neo4j returns missing properties as an explicit None value rather than
+    omitting the key, so `dict.get(key, default)` doesn't help — this does.
+    """
+    return float(value) if value is not None else default
+
+
 class TrustFeatureExtractor:
     """Converts Neo4j graph data into feature tensors for the GNN."""
 
@@ -56,14 +65,17 @@ class TrustFeatureExtractor:
             type_idx = self.entity_type_map.get(node.get("entity_type", ""), 0)
             features[i, type_idx % 4] = 1.0  # First 4 dims for type
 
-            # Extraction confidence
-            features[i, 4] = float(node.get("extraction_confidence", 0.5))
+            # Extraction confidence — dict.get's default only applies when the
+            # key is missing, but Neo4j returns the key with value None when
+            # the property doesn't exist on the node, so that must be handled
+            # explicitly or float(None) raises.
+            features[i, 4] = _num(node.get("extraction_confidence"), 0.5)
 
             # Source count (normalized)
-            features[i, 5] = min(float(node.get("source_count", 1)) / 5.0, 1.0)
+            features[i, 5] = min(_num(node.get("source_count"), 1) / 5.0, 1.0)
 
             # Current trust score (if exists)
-            features[i, 6] = float(node.get("trust_score", 0.5))
+            features[i, 6] = _num(node.get("trust_score"), 0.5)
 
             # Placeholder for degree (computed below)
             features[i, 7] = 0.0
@@ -85,7 +97,7 @@ class TrustFeatureExtractor:
                 src_indices.extend([src_idx, tgt_idx])
                 tgt_indices.extend([tgt_idx, src_idx])
 
-                conf = float(edge.get("extraction_confidence", 0.5))
+                conf = _num(edge.get("extraction_confidence"), 0.5)
                 edge_features_list.extend([conf, conf])
 
         # Compute degree feature
@@ -250,8 +262,8 @@ def generate_pseudo_labels(nodes: List[Dict[str, Any]]) -> Any:
 
     labels = []
     for node in nodes:
-        confidence = float(node.get("extraction_confidence", 0.5))
-        source_count = float(node.get("source_count", 1))
+        confidence = _num(node.get("extraction_confidence"), 0.5)
+        source_count = _num(node.get("source_count"), 1)
 
         # Heuristic trust score
         score = (

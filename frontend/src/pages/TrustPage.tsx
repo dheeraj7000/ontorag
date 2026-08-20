@@ -36,17 +36,22 @@ export default function TrustPage() {
     }
   }
 
+  const scoreClass = (score: number) =>
+    score <= 0.3 ? 'stat-good' : score <= 0.6 ? 'stat-warn' : 'stat-bad'
+
   return (
     <div>
       <div className="page-header">
-        <h1>Trust & Hallucination</h1>
-        <p>GNN trust scoring and answer verification</p>
+        <div>
+          <h1>Trust &amp; Hallucination</h1>
+          <p>GNN trust scoring and answer verification</p>
+        </div>
       </div>
 
       {/* Trust Scoring */}
       <div className="card">
         <div className="card-header">GNN Trust Scoring</div>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+        <p className="card-subtitle">
           Train the Graph Attention Network on the current knowledge graph to compute
           trust scores for all entities based on extraction confidence, source count,
           and neighborhood agreement.
@@ -56,10 +61,8 @@ export default function TrustPage() {
         </button>
 
         {trustResult && (
-          <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg)', borderRadius: '0.5rem' }}>
-            <pre style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {JSON.stringify(trustResult, null, 2)}
-            </pre>
+          <div className="code-block">
+            <pre>{JSON.stringify(trustResult, null, 2)}</pre>
           </div>
         )}
       </div>
@@ -67,48 +70,43 @@ export default function TrustPage() {
       {/* Hallucination Detection */}
       <div className="card">
         <div className="card-header">Hallucination Detection</div>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+        <p className="card-subtitle">
           Paste an LLM-generated answer to check if its claims are supported by the knowledge graph.
         </p>
         <form onSubmit={handleCheckHallucination}>
           <textarea
+            className="textarea"
             placeholder="Paste an answer to verify against the knowledge graph..."
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
           />
-          <button className="btn" style={{ marginTop: '0.75rem' }} disabled={checking || !answer.trim()}>
+          <button className="btn mt-3" disabled={checking || !answer.trim()}>
             {checking ? <><span className="spinner" /> Checking...</> : 'Check for Hallucinations'}
           </button>
         </form>
 
         {hallucinationResult && (
-          <div style={{ marginTop: '1.5rem' }}>
+          <div className="mt-4">
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-value" style={{
-                  color: hallucinationResult.hallucination_score <= 0.3
-                    ? 'var(--trust-high)'
-                    : hallucinationResult.hallucination_score <= 0.6
-                    ? 'var(--trust-medium)'
-                    : 'var(--trust-low)'
-                }}>
+                <div className={`stat-value ${scoreClass(hallucinationResult.hallucination_score)}`}>
                   {(hallucinationResult.hallucination_score * 100).toFixed(0)}%
                 </div>
                 <div className="stat-label">Hallucination Score</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{hallucinationResult.supported_claims}</div>
+                <div className="stat-value stat-good">{hallucinationResult.supported_claims}</div>
                 <div className="stat-label">Supported Claims</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                <div className="stat-value stat-bad">
                   {hallucinationResult.unsupported_claims}
                 </div>
                 <div className="stat-label">Unsupported Claims</div>
               </div>
             </div>
 
-            <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>{hallucinationResult.verdict}</p>
+            <p className="text-sm mt-3" style={{ marginBottom: 'var(--space-4)' }}>{hallucinationResult.verdict}</p>
 
             {hallucinationResult.claims.length > 0 && (
               <ul className="facts-list">

@@ -33,8 +33,10 @@ export default function QueryPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Query Knowledge Graph</h1>
-        <p>Ask questions grounded in ontology-validated facts with trust scoring</p>
+        <div>
+          <h1>Query Knowledge Graph</h1>
+          <p>Ask questions grounded in ontology-validated facts with trust scoring</p>
+        </div>
       </div>
 
       <div className="card">
@@ -42,6 +44,7 @@ export default function QueryPage() {
           <div className="input-group">
             <input
               type="text"
+              className="input"
               placeholder="Ask a question about your ingested documents..."
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
@@ -50,8 +53,8 @@ export default function QueryPage() {
               {loading ? <span className="spinner" /> : 'Ask'}
             </button>
           </div>
-          <div className="input-group" style={{ fontSize: '0.85rem' }}>
-            <label style={{ color: 'var(--text-muted)' }}>
+          <div className="range-row">
+            <label className="field-label">
               Min Trust: {minTrust.toFixed(2)}
               <input
                 type="range"
@@ -60,7 +63,6 @@ export default function QueryPage() {
                 step="0.05"
                 value={minTrust}
                 onChange={(e) => setMinTrust(parseFloat(e.target.value))}
-                style={{ marginLeft: '0.5rem', width: '150px' }}
               />
             </label>
           </div>
@@ -68,8 +70,18 @@ export default function QueryPage() {
       </div>
 
       {error && (
-        <div className="card" style={{ borderColor: 'var(--danger)' }}>
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
+        <div className="alert alert-danger">
+          <span className="alert-icon">⚠️</span>
+          <span>{error}</span>
+        </div>
+      )}
+
+      {!result && !error && !loading && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-icon">💬</div>
+            <p>Ask a question above to get a grounded answer from the knowledge graph.</p>
+          </div>
         </div>
       )}
 
@@ -78,13 +90,13 @@ export default function QueryPage() {
           <div className="card">
             <div className="card-header">
               <span>Answer</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                via {result.provider} | confidence: {result.confidence.toFixed(2)}
+              <span className="card-header-meta">
+                via {result.provider} · confidence {result.confidence.toFixed(2)}
               </span>
             </div>
             <div className="answer-block">{result.answer}</div>
             {result.reasoning && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+              <p className="reasoning-note">
                 <strong>Reasoning:</strong> {result.reasoning}
               </p>
             )}
@@ -98,7 +110,7 @@ export default function QueryPage() {
                   <li key={i}>
                     <TrustBadge score={fact.trust_score} />
                     <span>
-                      {fact.subject} <strong>—[{fact.relation}]→</strong> {fact.object}
+                      {fact.subject} <span className="fact-relation">—[{fact.relation}]→</span> {fact.object}
                     </span>
                   </li>
                 ))}
@@ -109,9 +121,9 @@ export default function QueryPage() {
           {result.linked_entities.length > 0 && (
             <div className="card">
               <div className="card-header">Linked Entities</div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="chip-row">
                 {result.linked_entities.map((e, i) => (
-                  <span key={i} className="trust-badge trust-medium">{e}</span>
+                  <span key={i} className="chip">{e}</span>
                 ))}
               </div>
             </div>

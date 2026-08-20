@@ -2,7 +2,7 @@
 
 A production-ready Retrieval-Augmented Generation system that grounds retrieval in a domain ontology, scores fact trustworthiness using Graph Neural Networks, detects hallucinations by cross-checking against the knowledge graph, and explains every answer via provenance visualization.
 
-**Live:** http://32.195.248.147 | **Cost:** $0/month (free tier stack)
+**Live:** https://ontorag.duckdns.org | **Cost:** $0/month (free tier stack)
 
 ---
 
@@ -268,7 +268,7 @@ The instance includes 2GB swap. Services are tuned for low memory:
 | POST | `/api/v1/eval/run` | Run evaluation benchmark |
 | GET | `/api/v1/eval/dataset` | Benchmark dataset info |
 
-Interactive API docs: http://32.195.248.147/docs
+Interactive API docs: https://ontorag.duckdns.org/docs
 
 ---
 

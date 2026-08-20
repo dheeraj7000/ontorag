@@ -44,8 +44,10 @@ export default function IngestPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Ingest Documents</h1>
-        <p>Upload documents to build the knowledge graph (PDF, Markdown, HTML, TXT)</p>
+        <div>
+          <h1>Ingest Documents</h1>
+          <p>Upload documents to build the knowledge graph (PDF, Markdown, HTML, TXT)</p>
+        </div>
       </div>
 
       <div className="card">
@@ -55,17 +57,15 @@ export default function IngestPage() {
         >
           {uploading ? (
             <>
-              <span className="spinner" style={{ width: '2rem', height: '2rem' }} />
-              <p style={{ marginTop: '1rem' }}>Processing document...</p>
+              <span className="spinner spinner-lg" />
+              <p className="upload-title mt-3">Processing document...</p>
+              <p className="upload-hint">This may take a few seconds</p>
             </>
           ) : (
             <>
-              <p style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
-                📄 Click to upload a document
-              </p>
-              <p style={{ color: 'var(--text-muted)' }}>
-                Supports: .pdf, .md, .html, .txt
-              </p>
+              <div className="upload-icon">📄</div>
+              <p className="upload-title">Click to upload a document</p>
+              <p className="upload-hint">Supports: .pdf, .md, .html, .txt</p>
             </>
           )}
           <input
@@ -78,42 +78,50 @@ export default function IngestPage() {
       </div>
 
       {error && (
-        <div className="card" style={{ borderColor: 'var(--danger)' }}>
-          <p style={{ color: 'var(--danger)' }}>{error}</p>
+        <div className="alert alert-danger">
+          <span className="alert-icon">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
-      {jobs.length > 0 && (
-        <div className="card">
-          <div className="card-header">Ingestion History</div>
-          <table style={{ width: '100%', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-                <th style={{ padding: '0.5rem' }}>File</th>
-                <th>Status</th>
-                <th>Chunks</th>
-                <th>Entities</th>
-                <th>Relations</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr key={job.file_id} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ padding: '0.5rem' }}>{job.filename}</td>
-                  <td>
-                    <span className={`trust-badge trust-${job.status === 'completed' ? 'high' : job.status === 'error' ? 'low' : 'medium'}`}>
-                      {job.status}
-                    </span>
-                  </td>
-                  <td>{job.total_chunks}</td>
-                  <td>{job.entities_inserted}</td>
-                  <td>{job.relations_inserted}</td>
+      <div className="card">
+        <div className="card-header">Ingestion History</div>
+        {jobs.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🗂️</div>
+            <p>No documents ingested yet. Upload one above to get started.</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Status</th>
+                  <th>Chunks</th>
+                  <th>Entities</th>
+                  <th>Relations</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr key={job.file_id}>
+                    <td>{job.filename}</td>
+                    <td>
+                      <span className={`trust-badge trust-${job.status === 'completed' ? 'high' : job.status === 'error' ? 'low' : 'medium'}`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td>{job.total_chunks}</td>
+                    <td>{job.entities_inserted}</td>
+                    <td>{job.relations_inserted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
