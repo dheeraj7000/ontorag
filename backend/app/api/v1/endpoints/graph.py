@@ -79,9 +79,18 @@ async def get_subgraph(entity_name: str, hops: int = 2):
     try:
         await db.connect()
 
-        # Get the subgraph within N hops
+        # Get the subgraph within N hops.
+        # Neo4j doesn't allow a bound parameter inside a variable-length
+        # relationship range ([*1..$hops] is a syntax error) — the hop count
+        # has to be a literal in the pattern. `hops` is safe to interpolate
+        # here since FastAPI's `hops: int` type annotation already coerces
+        # or rejects the query param before this code runs.
+        hops = max(1, min(hops, 5))  # guard against pathological values
+        # Plain string with a manual .replace() for the hop count, rather than
+        # an f-string — this Cypher is full of literal {..} map syntax that
+        # an f-string would try (and fail) to parse as interpolation.
         cypher = """
-        MATCH path = (center:Entity {name: $entity_name})-[*1..$hops]-(connected)
+        MATCH path = (center:Entity {name: $entity_name})-[*1..__HOPS__]-(connected)
         WHERE connected:Entity
         WITH nodes(path) as ns, relationships(path) as rs
         UNWIND ns as n
@@ -105,11 +114,9 @@ async def get_subgraph(entity_name: str, hops: int = 2):
                    type: type(rel),
                    trust_score: rel.trust_score
                }) as edges
-        """
+        """.replace("__HOPS__", str(hops))
 
-        results = await db.execute_query(
-            cypher, {"entity_name": entity_name, "hops": hops}
-        )
+        results = await db.execute_query(cypher, {"entity_name": entity_name})
 
         if not results:
             raise HTTPException(

@@ -10,6 +10,7 @@ Pipeline:
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import List
 
@@ -102,6 +103,14 @@ class OntologyGuidedRetriever:
             min_trust=min_trust,
         )
 
+        # Fallback: a linked entity with no qualifying relations (e.g. sparse
+        # extraction from a short document) would otherwise return nothing
+        # at all even though we know something about it. Surface its own
+        # properties as a minimal fact so there's still something to answer
+        # with, instead of "couldn't find relevant information".
+        if not facts:
+            facts = await self._entity_self_facts(linked_entities)
+
         # Step 3: Sort by trust score and take top_k
         facts.sort(key=lambda f: f.trust_score, reverse=True)
         result.facts = facts[:top_k]
@@ -162,23 +171,50 @@ class OntologyGuidedRetriever:
 
     async def _keyword_search(self, query: str) -> List[str]:
         """Fallback: simple keyword matching against entity names."""
-        # Extract key terms from query (simple tokenization)
-        terms = [t.lower() for t in query.split() if len(t) > 3]
+        # Extract key terms from query (simple tokenization). Strip
+        # punctuation first — otherwise a term like "GCAF-Net?" (trailing "?"
+        # from a "What is X?" question) never CONTAINS-matches the actual
+        # entity name "GCAF-Net", silently killing entity linking for any
+        # question that ends right after the entity name.
+        raw_terms = re.findall(r"[A-Za-z0-9][A-Za-z0-9\-_]*", query)
+        terms = [t.lower() for t in raw_terms if len(t) > 3]
 
         if not terms:
             return []
 
-        # Build Cypher CONTAINS query
-        conditions = " OR ".join(
-            [f"toLower(n.name) CONTAINS '{term}'" for term in terms[:5]]
-        )
-
+        # Match via a parameterized list instead of interpolating terms
+        # directly into the query string — the old CONTAINS('{term}') form
+        # broke (and was Cypher-injectable) for any term containing a quote.
         results = await self.db.execute_query(
-            f"MATCH (n:Entity) WHERE {conditions} "
-            f"RETURN n.name as name ORDER BY n.trust_score DESC LIMIT 5"
+            "MATCH (n:Entity) WHERE ANY(term IN $terms WHERE toLower(n.name) CONTAINS term) "
+            "RETURN n.name as name ORDER BY n.trust_score DESC LIMIT 5",
+            {"terms": terms[:5]},
         )
 
         return [r["name"] for r in results]
+
+    async def _entity_self_facts(self, entity_names: List[str]) -> List[RetrievedFact]:
+        """Describe linked entities via their own properties (type, source)
+        when they have no qualifying relations to traverse."""
+        results = await self.db.execute_query(
+            "MATCH (n:Entity) WHERE n.name IN $entity_names "
+            "RETURN n.name as name, n.entity_type as entity_type, "
+            "n.trust_score as trust_score, n.source_document as source_document",
+            {"entity_names": entity_names},
+        )
+
+        return [
+            RetrievedFact(
+                subject=r["name"],
+                relation="IS_A",
+                object=r.get("entity_type") or "Entity",
+                trust_score=float(r.get("trust_score")) if r.get("trust_score") is not None else 0.5,
+                source_document=r.get("source_document") or "unknown",
+                subject_type=r.get("entity_type") or "",
+                object_type="",
+            )
+            for r in results
+        ]
 
     async def _traverse_subgraph(
         self,
@@ -191,13 +227,18 @@ class OntologyGuidedRetriever:
         """
         facts: List[RetrievedFact] = []
 
-        # Query for all relationships within N hops of the linked entities
+        # Query for all relationships within N hops of the linked entities.
+        # Undirected match — a linked entity is just as relevant as the
+        # object of a fact ("OntoRAG USES Neo4j") as it is the subject, but
+        # startNode/endNode still give the true direction for subject/object.
         cypher = """
-        MATCH (src:Entity)-[r]->(tgt:Entity)
-        WHERE src.name IN $entity_names
+        MATCH (a:Entity)-[r]-(b:Entity)
+        WHERE (a.name IN $entity_names OR b.name IN $entity_names)
           AND (r.trust_score >= $min_trust OR r.trust_score IS NULL)
-          AND (tgt.trust_score >= $min_trust OR tgt.trust_score IS NULL)
-        RETURN src.name as subject, src.entity_type as subject_type,
+          AND (a.trust_score >= $min_trust OR a.trust_score IS NULL)
+          AND (b.trust_score >= $min_trust OR b.trust_score IS NULL)
+        WITH startNode(r) as src, endNode(r) as tgt, r
+        RETURN DISTINCT src.name as subject, src.entity_type as subject_type,
                type(r) as relation, r.trust_score as rel_trust,
                r.source_document as source_document,
                tgt.name as object, tgt.entity_type as object_type,
